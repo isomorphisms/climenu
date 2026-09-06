@@ -18,10 +18,6 @@ android {
     buildFeatures {
         compose = true
     }
-
-    sourceSets.named("main") {
-        kotlin.srcDir("../../..")
-    }
 }
 
 dependencies {
