@@ -44,12 +44,21 @@ adb shell am start -n org.isomorphisms.climenu/.MainActivity \
 
 ## Acceptance
 
-The first acceptance boundary is visual and intentionally narrow:
+### Hosted build
 
-1. `./build` produces `climenu.apk`.
-2. The APK installs and starts.
-3. The screen uses Material 3 components.
-4. It displays the requested prompt and choices.
-5. Tapping a row marks exactly that row selected and prints its value below the list.
+The hosted boundary is deliberately smaller than a device receipt:
 
-JNI/native/Idriç integration comes after this boundary is trustworthy; it should carry actual menu data/actions rather than exist only as a placeholder.
+1. JDK 17, Android SDK platform 37.0, Android Build Tools 36.0.0, and Gradle 9.6.0 are available.
+2. `./build` completes and produces `climenu.apk`.
+3. `climenu.apk` is non-empty and passes ZIP integrity checking.
+
+Passing this boundary proves that the Android project compiles and packages. It does **not** prove installation, launch, rendering, dynamic color, or interaction on a device.
+
+### Device receipt still required
+
+1. The APK installs and starts on an Android device.
+2. The screen renders the Material 3 prompt and requested choices.
+3. Tapping a row marks exactly that row selected and displays its value below the list.
+4. Android 12+ dynamic color is checked on a device that supports it.
+
+JNI/native/Idriç integration comes after these boundaries are trustworthy; it should carry actual menu data/actions rather than exist only as a placeholder.
