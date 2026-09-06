@@ -1,0 +1,240 @@
+module Climenu
+
+import Data.String
+import System
+import System.File
+
+
+choice origin one_of
+  help_text
+  man_page
+  completion_spec
+  parser_source
+
+
+record Flag where
+  constructor make_flag
+  syntax : String
+  description : String
+  examples : List String
+  origins : List origin
+
+
+record Command where
+  constructor make_command
+  executable : String
+  summary : String
+  flags : List Flag
+
+
+drop_gap : List Char → List Char
+drop_gap (' ' :: rest) = drop_gap rest
+drop_gap ('\t' :: rest) = drop_gap rest
+drop_gap rest = rest
+
+
+take_form : List Char → List Char
+take_form [] = []
+take_form (',' :: rest) = []
+take_form (c :: rest) = c :: take_form rest
+
+
+find_long_form : List Char → Maybe (List Char)
+find_long_form [] = Nothing
+find_long_form ('-' :: '-' :: rest) = Just ('-' :: '-' :: take_form rest)
+find_long_form (_ :: rest) = find_long_form rest
+
+
+preferred_form : String → String
+preferred_form text =
+  case find_long_form (unpack text) of
+    Just chars => trim (pack chars)
+    Nothing => trim (pack (take_form (unpack text)))
+
+
+split_columns_chars : List Char → (List Char, List Char)
+split_columns_chars chars = split [] chars
+  where
+    split : List Char → List Char → (List Char, List Char)
+    split left [] = (reverse left, [])
+    split left (' ' :: ' ' :: rest) = (reverse left, drop_gap rest)
+    split left ('\t' :: rest) = (reverse left, drop_gap rest)
+    split left (c :: rest) = split (c :: left) rest
+
+
+split_columns : String → (String, String)
+split_columns text =
+  case split_columns_chars (unpack (ltrim text)) of
+    (left, right) => (trim (pack left), trim (pack right))
+
+
+starts_flag : String → Bool
+starts_flag text =
+  case unpack (ltrim text) of
+    '-' :: rest => True
+    _ => False
+
+
+example_for : String → String → String
+example_for executable syntax =
+  executable ++ " " ++ preferred_form syntax
+
+
+parse_flag : String → String → Flag
+parse_flag executable line =
+  case split_columns line of
+    (syntax, description) =>
+      make_flag syntax description [example_for executable syntax] [help_text]
+
+
+parse_flags : String → List String → List Flag
+parse_flags executable [] = []
+parse_flags executable (line :: rest) =
+  if starts_flag line
+    then parse_flag executable line :: parse_flags executable rest
+    else parse_flags executable rest
+
+
+parse_help : String → String → Command
+parse_help executable body =
+  make_command executable "" (parse_flags executable (lines body))
+
+
+escape_char : Char → String
+escape_char '&' = "&amp;"
+escape_char '<' = "&lt;"
+escape_char '>' = "&gt;"
+escape_char '"' = "&quot;"
+escape_char '\'' = "&#39;"
+escape_char c = pack [c]
+
+
+escape_html_chars : List Char → String
+escape_html_chars [] = ""
+escape_html_chars (c :: rest) = escape_char c ++ escape_html_chars rest
+
+
+escape_html : String → String
+escape_html text = escape_html_chars (unpack text)
+
+
+origin_name : origin → String
+origin_name help_text = "--help"
+origin_name man_page = "man page"
+origin_name completion_spec = "completion"
+origin_name parser_source = "argument parser"
+
+
+render_origins : List origin → String
+render_origins [] = ""
+render_origins (item :: rest) =
+  "<span class=\"source\">" ++ escape_html (origin_name item) ++ "</span>" ++
+  render_origins rest
+
+
+render_examples : List String → String
+render_examples [] = ""
+render_examples (example :: rest) =
+  "<div class=\"example-row\"><code class=\"example\">" ++
+  escape_html example ++
+  "</code><button class=\"copy\" type=\"button\">copy</button></div>" ++
+  render_examples rest
+
+
+render_flag : Flag → String
+render_flag flag =
+  "<article class=\"flag\">" ++
+    "<header><code class=\"syntax\">" ++ escape_html flag.syntax ++ "</code>" ++
+      "<div class=\"sources\">" ++ render_origins flag.origins ++ "</div>" ++
+    "</header>" ++
+    "<p>" ++ escape_html flag.description ++ "</p>" ++
+    render_examples flag.examples ++
+  "</article>"
+
+
+render_flags : List Flag → String
+render_flags [] =
+  "<p class=\"empty\">No option lines were recognized. The original help text may use a layout this parser does not understand yet.</p>"
+render_flags (flag :: rest) = render_flag flag ++ render_flags rest
+
+
+page_style : String
+page_style =
+  "<style>" ++
+  ":root{font-family:system-ui,sans-serif;color-scheme:light dark}" ++
+  "body{max-width:72rem;margin:0 auto;padding:2rem}" ++
+  "h1{margin-bottom:.25rem}" ++
+  ".lede{max-width:60rem;margin-top:0;color:color-mix(in srgb,currentColor 70%,transparent)}" ++
+  "#search{box-sizing:border-box;width:100%;font:inherit;padding:.8rem 1rem;margin:1rem 0 1.5rem}" ++
+  ".flags{display:grid;grid-template-columns:repeat(auto-fit,minmax(20rem,1fr));gap:1rem}" ++
+  ".flag{border:1px solid color-mix(in srgb,currentColor 22%,transparent);border-radius:.7rem;padding:1rem}" ++
+  ".flag header{display:flex;gap:1rem;justify-content:space-between;align-items:flex-start}" ++
+  ".syntax{font-weight:700;overflow-wrap:anywhere}" ++
+  ".sources{display:flex;gap:.35rem;flex-wrap:wrap;justify-content:flex-end}" ++
+  ".source{font-size:.75rem;border:1px solid currentColor;border-radius:999px;padding:.1rem .45rem;white-space:nowrap}" ++
+  ".flag p{min-height:2.5em}" ++
+  ".example-row{display:flex;gap:.5rem;align-items:center}" ++
+  ".example{overflow-wrap:anywhere}" ++
+  ".copy{margin-left:auto}" ++
+  ".empty{font-style:italic}" ++
+  "</style>"
+
+
+page_script : String
+page_script =
+  "<script>" ++
+  "const search=document.querySelector('#search');" ++
+  "search.addEventListener('input',()=>{" ++
+    "const q=search.value.toLowerCase();" ++
+    "document.querySelectorAll('.flag').forEach(card=>{" ++
+      "card.hidden=!card.textContent.toLowerCase().includes(q);" ++
+    "});" ++
+  "});" ++
+  "document.querySelectorAll('.copy').forEach(button=>{" ++
+    "button.addEventListener('click',()=>{" ++
+      "const text=button.previousElementSibling.textContent;" ++
+      "navigator.clipboard.writeText(text);" ++
+    "});" ++
+  "});" ++
+  "</script>"
+
+
+render : Command → String
+render command =
+  "<!doctype html><html><head><meta charset=\"utf-8\">" ++
+  "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" ++
+  "<title>" ++ escape_html command.executable ++ " — climenu</title>" ++
+  page_style ++
+  "</head><body>" ++
+  "<h1>" ++ escape_html command.executable ++ "</h1>" ++
+  "<p class=\"lede\">Options discovered from the program's help output. Search them together instead of recalling flags from memory.</p>" ++
+  "<input id=\"search\" type=\"search\" placeholder=\"filter options, descriptions, examples…\" autofocus>" ++
+  "<main class=\"flags\">" ++ render_flags command.flags ++ "</main>" ++
+  page_script ++
+  "</body></html>"
+
+
+usage : String
+usage = "usage: PROGRAM --help | climenu PROGRAM > PROGRAM.html"
+
+
+run : String → IO ()
+run executable = do
+  incoming ← fRead stdin
+  case incoming of
+    Left problem => do
+      putStrLn "climenu: could not read help text from stdin"
+      exitFailure
+    Right body =>
+      putStr (render (parse_help executable body))
+
+
+main : IO ()
+main = do
+  arguments ← getArgs
+  case arguments of
+    _ :: "--help" :: [] => putStrLn usage
+    _ :: executable :: [] => run executable
+    _ => do
+      putStrLn usage
+      exitFailure
