@@ -2,32 +2,39 @@
 
 A command-line interface should be inspectable as an interface, not memorized as folklore.
 
-`climenu` turns CLI metadata into one browsable GUI: flags together, descriptions beside them, examples beside those, and provenance retained so information from `--help`, man pages, completion files, or source code can eventually be merged instead of making the user visit four different representations.
+`climenu` turns CLI metadata into one browsable GUI: flags together, descriptions beside them, examples beside those, with provenance retained so `--help`, man pages, completion files, and argument-parser/source metadata can be merged instead of making the user visit several representations.
 
-## First vertical slice
+## First Edric slice
 
-The first implementation is `Climenu.idric`.
+`Climenu.idric` implements the semantic core as a pure transformation:
 
-It accepts ordinary help text on stdin and emits one self-contained HTML page on stdout:
-
-```sh
-grep --help | climenu grep > grep.html
+```text
+climenu : String → String → String
 ```
+
+Give it an executable name and ordinary `--help` text; it returns a self-contained searchable HTML page.
 
 The page currently provides:
 
 - every option line the help parser recognizes;
-- the option's documented spelling and description;
-- an automatically constructed example using the long spelling when one exists;
-- a source badge (`--help` in this first adapter);
-- filtering across all options;
-- one-click copying of examples.
+- the documented option spelling and description;
+- an automatically constructed example, preferring the long spelling;
+- provenance (`--help` in this first adapter);
+- filtering across all options.
 
-The stdin boundary is intentional. Capturing a program's help output and understanding it are different jobs, and keeping them separate preserves the normal Unix pipe interface. Automatic invocation can be added without coupling the parser or GUI to process-launching code.
+`example.help` is a small parser fixture.
+
+The desired shell interface is:
+
+```sh
+PROGRAM --help | climenu PROGRAM > PROGRAM.html
+```
+
+That process/stdin adapter is deliberately not claimed yet. The current Idriç fork does not expose the upstream `System.File`/`fRead` interface, so this PR keeps the implemented core independent of a runtime API that is not present.
 
 ## Internal model
 
-The GUI does not parse help text. It renders a normalized command description:
+The renderer consumes one normalized command description:
 
 ```text
 Command
@@ -42,7 +49,7 @@ Flag
   origins
 ```
 
-An `origin` records where a fact came from. The model already names four sources:
+An `origin` says where a fact came from. The model already names four evidence sources:
 
 ```text
 --help
@@ -51,30 +58,29 @@ completion specification
 argument-parser/source metadata
 ```
 
-That is the important boundary: new discovery mechanisms enrich the same command description instead of becoming new user interfaces.
+New discovery mechanisms should enrich this same description rather than create new user interfaces.
 
-## Discovery order
+## Discovery
 
-No single discovery method works for every program. The intended ladder is:
+No single method works for every CLI. The intended evidence ladder is:
 
-1. structured metadata deliberately exposed by the program, when available;
+1. structured metadata deliberately exposed by the program;
 2. argument-parser/source introspection;
 3. shell-completion specifications;
 4. man pages;
-5. `--help` text as the universal-ish fallback.
+5. `--help` text as the broad fallback.
 
-These are evidence sources, not mutually exclusive modes. When several exist, `climenu` should merge them and retain provenance. A man page may have a better explanation; parser metadata may know that a value is an enum; completion data may know legal values; source examples may show realistic invocations.
+They are not mutually exclusive modes. `climenu` should merge what they know while retaining provenance: parser metadata may know that a value is an enum, completion data may know legal values, a man page may explain semantics better, and examples may provide realistic invocations.
 
-## Near-term work
-
-The next useful slices are:
+## Next slices
 
 - preserve wrapped/multiline help descriptions;
-- identify option arguments separately from aliases;
+- split aliases and option arguments into typed fields;
 - represent subcommands as a command tree;
-- add a man-page adapter and merge it with `--help` evidence;
+- merge a man-page adapter with `--help` evidence;
 - add completion adapters;
-- add parser-specific adapters where the parser exposes substantially better structure;
-- turn option value metadata into real GUI controls rather than only documentation cards.
+- add parser-specific adapters where they expose better structure;
+- turn typed option values into GUI controls rather than documentation cards;
+- add the executable/stdin bridge once the Edric runtime boundary is established.
 
 The generated HTML is only the first renderer. The normalized command description is the durable part.
