@@ -22,7 +22,7 @@ The page currently provides:
 - provenance (`--help` in this first adapter);
 - filtering across all options.
 
-`example.help` is a small parser fixture.
+`example.help` is a small parser fixture. `example.html` is the corresponding browser-viewable output fixture.
 
 The desired shell interface is:
 
@@ -30,7 +30,7 @@ The desired shell interface is:
 PROGRAM --help | climenu PROGRAM > PROGRAM.html
 ```
 
-That process/stdin adapter is deliberately not claimed yet. The current Idriç fork does not expose the upstream `System.File`/`fRead` interface, so this PR keeps the implemented core independent of a runtime API that is not present.
+That process/stdin adapter is deliberately not claimed yet. Existing Edric code uses `System` for process arguments, but I did not find a demonstrated stdin-reading path in the current Edric repositories and could not compile one here. This PR keeps the semantic core independent of that unresolved runtime boundary rather than guessing at it.
 
 ## Internal model
 
