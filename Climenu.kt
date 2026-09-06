@@ -33,11 +33,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val prompt = intent.getStringExtra("prompt") ?: "Choose an action"
+        val prompt = intent.getStringExtra("prompt") ?: gh_prompt
         val choices = intent.getStringArrayExtra("choices")
             ?.toList()
             ?.takeIf { it.isNotEmpty() }
-            ?: listOf("Run", "Settings", "Quit")
+            ?: gh_root_commands
 
         setContent {
             ClimenuTheme {
