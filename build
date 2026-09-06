@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+cd "$repo_dir"
+
+gradle -p _/android :app:assembleDebug
+cp _/android/app/build/outputs/apk/debug/app-debug.apk climenu.apk
+printf '%s\n' "$repo_dir/climenu.apk"
