@@ -1,0 +1,10 @@
+kind	title	url
+manual	GitHub CLI manual	https://cli.github.com/manual/
+manual-page	gh root manual	https://cli.github.com/manual/gh
+examples	GitHub CLI usage examples	https://cli.github.com/manual/examples
+documentation	GitHub CLI documentation	https://docs.github.com/en/github-cli
+quickstart	GitHub CLI quickstart	https://docs.github.com/en/github-cli/github-cli/quickstart
+source	cli/cli v2.100.0	https://github.com/cli/cli/tree/v2.100.0
+architecture	cli/cli project layout	https://github.com/cli/cli/blob/v2.100.0/docs/project-layout.md
+syntax	cli/cli command-line syntax	https://github.com/cli/cli/blob/v2.100.0/docs/command-line-syntax.md
+parser-library	Cobra	https://github.com/spf13/cobra

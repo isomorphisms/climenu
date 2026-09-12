@@ -1,0 +1,68 @@
+#!/bin/sh
+set -eu
+
+version=${GH_EXAMPLE_VERSION:-v2.100.0}
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+out=${GH_EXAMPLE_OUT:-"$repo_root/examples/gh/imported/$version"}
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+
+if ! command -v gh >/dev/null 2>&1; then
+    echo 'import-gh requires GitHub CLI (gh)' >&2
+    exit 1
+fi
+
+rm -rf "$out"
+mkdir -p "$out/help" "$out/parser" "$out/man1"
+
+# Capture the complete reference exposed by the installed gh executable.
+gh --version > "$out/GH_VERSION.txt"
+gh help > "$out/help/gh.txt"
+gh help reference > "$out/help/reference.txt"
+
+# Recover source matching the requested release. gh uses Cobra/pflag; flag
+# declarations are distributed through pkg/cmd rather than living in one parser file.
+gh repo clone cli/cli "$tmp/cli" -- --branch "$version" --depth 1
+
+git -C "$tmp/cli" rev-parse HEAD > "$out/UPSTREAM_COMMIT.txt"
+cp "$tmp/cli/LICENSE" "$out/LICENSE"
+cp "$tmp/cli/go.mod" "$out/parser/go.mod"
+cp "$tmp/cli/go.sum" "$out/parser/go.sum"
+mkdir -p "$out/parser/pkg"
+cp -R "$tmp/cli/pkg/cmd" "$out/parser/pkg/cmd"
+cp -R "$tmp/cli/pkg/cmdutil" "$out/parser/pkg/cmdutil"
+mkdir -p "$out/parser/docs"
+cp "$tmp/cli/docs/command-line-syntax.md" "$out/parser/docs/"
+cp "$tmp/cli/docs/project-layout.md" "$out/parser/docs/"
+cp "$tmp/cli/pkg/cmd/root/root.go" "$out/parser/root.go"
+
+# Generate the exact release manpage tree when a suitable Go toolchain is
+# available. Modern Go can obtain the requested toolchain automatically.
+if command -v go >/dev/null 2>&1; then
+    if (cd "$tmp/cli" && GOTOOLCHAIN=auto make manpages); then
+        cp "$tmp/cli"/share/man/man1/gh*.1 "$out/man1/"
+    else
+        echo 'warning: parser/help corpus imported, but pinned manpage generation failed' >&2
+    fi
+else
+    echo 'warning: Go not found; parser/help corpus imported without generated manpages' >&2
+fi
+
+# If the local gh package ships a system manpage, retain that too.
+if command -v man >/dev/null 2>&1; then
+    installed_man=$(man -w gh 2>/dev/null || true)
+    if [ -n "$installed_man" ] && [ -f "$installed_man" ]; then
+        cp "$installed_man" "$out/man1/installed-$(basename "$installed_man")"
+    fi
+fi
+
+cat > "$out/PROVENANCE.txt" <<EOF
+upstream=https://github.com/cli/cli
+requested_version=$version
+manual=https://cli.github.com/manual/
+docs=https://docs.github.com/en/github-cli
+parser_root=pkg/cmd/root/root.go
+parser_library=github.com/spf13/cobra
+EOF
+
+printf 'Imported gh fixture into %s\n' "$out"
